@@ -1,0 +1,1 @@
+# Changelog\n\n## v1.0.0\n- Added versioning in UI and package files\n- Added QR share overlay using online QR image generation\n- Updated custom horn playback to use a single persistent audio element\n- Kept responsive layout and current timer logic\n- Reset to defaults after final horn sequence\n

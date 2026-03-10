@@ -10,216 +10,58 @@
 <meta name="apple-mobile-web-app-title" content="BL Timer">
 <style>
 :root{
-  --bg:#000;
-  --panel:#101010;
-  --text:#fff;
-  --muted:#d0d0d0;
-  --led:#00ff66;
-  --start:#00ff66;
-  --pause:#ffb020;
-  --reset:#ff3b30;
-  --share:#ffffff;
-  --radius:14px;
-  --gap:14px;
-  --safe-bottom: max(16px, env(safe-area-inset-bottom));
+  --bg:#000;--panel:#101010;--text:#fff;--muted:#d0d0d0;--led:#00ff66;
+  --start:#00ff66;--pause:#ffb020;--reset:#ff3b30;--share:#ffffff;
+  --radius:14px;--safe-bottom:max(16px, env(safe-area-inset-bottom))
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
 body{min-height:100vh}
-.wrap{
-  width:min(100%, 980px);
-  margin:0 auto;
-  padding:clamp(14px, 2vw, 22px) clamp(12px, 3vw, 24px) calc(24px + var(--safe-bottom));
-}
-.header{
-  padding:8px 0 6px;
-  font-size:clamp(18px, 3vw, 24px);
-  font-weight:700;
-  letter-spacing:.04em;
-  text-align:center;
-}
-.clock{
-  font-size:clamp(72px, 24vw, 190px);
-  line-height:1;
-  margin-top:clamp(16px, 4vw, 28px);
-  color:var(--led);
-  font-weight:800;
-  font-variant-numeric:tabular-nums;
-  text-shadow:0 0 16px rgba(0,255,102,.22);
-  text-align:center;
-}
-.label{
-  margin-top:8px;
-  font-size:clamp(14px, 2.8vw, 18px);
-  letter-spacing:.08em;
-  text-align:center;
-}
-.repetition{
-  margin-top:12px;
-  font-size:clamp(16px, 3.2vw, 22px);
-  text-align:center;
-}
-.buttons{
-  margin-top:clamp(24px, 5vw, 36px);
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
-  gap:12px;
-}
-button{
-  border:none;
-  border-radius:12px;
-  font-size:clamp(18px, 4vw, 20px);
-  font-weight:700;
-  min-height:56px;
-  padding:14px 16px;
-  cursor:pointer;
-  -webkit-tap-highlight-color:transparent;
-  width:100%;
-}
+.wrap{width:min(100%,980px);margin:0 auto;padding:clamp(14px,2vw,22px) clamp(12px,3vw,24px) calc(24px + var(--safe-bottom))}
+.header{padding:8px 0 6px;font-size:clamp(18px,3vw,24px);font-weight:700;letter-spacing:.04em;text-align:center}
+.clock{font-size:clamp(72px,24vw,190px);line-height:1;margin-top:clamp(16px,4vw,28px);color:var(--led);font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(0,255,102,.22);text-align:center}
+.label{margin-top:8px;font-size:clamp(14px,2.8vw,18px);letter-spacing:.08em;text-align:center}
+.repetition{margin-top:12px;font-size:clamp(16px,3.2vw,22px);text-align:center}
+.buttons{margin-top:clamp(24px,5vw,36px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+button{border:none;border-radius:12px;font-size:clamp(18px,4vw,20px);font-weight:700;min-height:56px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;width:100%}
 .start{background:var(--start);color:#000}
 .pause{background:var(--pause);color:#000}
 .reset{background:var(--reset);color:#fff}
 .share{background:var(--share);color:#000}
-.settings{
-  margin:clamp(24px, 5vw, 34px) auto 0;
-  width:min(100%, 720px);
-  background:var(--panel);
-  border-radius:var(--radius);
-  padding:clamp(14px, 3vw, 20px);
-}
-.row{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:12px;
-  margin-bottom:12px;
-}
-.field{
-  display:grid;
-  gap:8px;
-  text-align:left;
-}
-label{
-  font-weight:700;
-  font-size:15px;
-}
-input[type=number], input[type=file]{
-  width:100%;
-  padding:12px 10px;
-  font-size:16px;
-  border-radius:10px;
-  border:1px solid #2b2b2b;
-  background:#181818;
-  color:#fff;
-}
-.hint,.status{
-  font-size:14px;
-  color:var(--muted);
-  text-align:left;
-}
-.status{min-height:18px; margin-top:4px}
-.overlay{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.92);
-  display:none;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  padding:20px;
-  z-index:999;
-}
-.qrbox{
-  background:#fff;
-  border-radius:14px;
-  padding:18px;
-  max-width:min(90vw, 320px);
-}
-.qrbox img{
-  display:block;
-  width:min(70vw, 256px);
-  height:min(70vw, 256px);
-}
-.qrurl{
-  margin-top:14px;
-  color:#fff;
-  word-break:break-all;
-  max-width:min(90vw, 560px);
-  font-size:14px;
-  text-align:center;
-}
-.qrnote{
-  margin-top:8px;
-  color:var(--muted);
-  font-size:13px;
-  text-align:center;
-}
-.smallbuttons{
-  margin-top:18px;
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:12px;
-  width:min(90vw, 360px);
-}
-.smallbuttons button{
-  font-size:16px;
-  min-height:48px;
-  padding:12px 14px;
-}
+.settings{margin:clamp(24px,5vw,34px) auto 0;width:min(100%,720px);background:var(--panel);border-radius:var(--radius);padding:clamp(14px,3vw,20px)}
+.row{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.field{display:grid;gap:8px;text-align:left}
+label{font-weight:700;font-size:15px}
+input[type=number], input[type=file]{width:100%;padding:12px 10px;font-size:16px;border-radius:10px;border:1px solid #2b2b2b;background:#181818;color:#fff}
+.hint,.status,.version{font-size:14px;color:var(--muted);text-align:left}
+.status{min-height:18px;margin-top:4px}
+.version{margin-top:14px;opacity:.9}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;justify-content:center;align-items:center;flex-direction:column;padding:20px;z-index:999}
+.qrbox{background:#fff;border-radius:14px;padding:18px;max-width:min(90vw,320px)}
+.qrbox img{display:block;width:min(70vw,256px);height:min(70vw,256px)}
+.qrurl{margin-top:14px;color:#fff;word-break:break-all;max-width:min(90vw,560px);font-size:14px;text-align:center}
+.qrnote{margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+.smallbuttons{margin-top:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(90vw,360px)}
+.smallbuttons button{font-size:16px;min-height:48px;padding:12px 14px}
 @media (min-width: 640px){
-  .buttons{
-    grid-template-columns:repeat(4, minmax(0,1fr));
-  }
-  .row.row-two{
-    grid-template-columns:repeat(2, minmax(0,1fr));
-  }
+  .buttons{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .row.row-two{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width: 900px){
-  .wrap.landscape-layout{
-    display:grid;
-    grid-template-columns:minmax(0, 1.1fr) minmax(340px, .9fr);
-    gap:24px;
-    align-items:start;
-  }
-  .wrap.landscape-layout .top{
-    min-height:70vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-  }
-  .wrap.landscape-layout .settings{
-    margin-top:0;
-    position:sticky;
-    top:18px;
-  }
+  .wrap.landscape-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr);gap:24px;align-items:start}
+  .wrap.landscape-layout .top{min-height:70vh;display:flex;flex-direction:column;justify-content:center}
+  .wrap.landscape-layout .settings{margin-top:0;position:sticky;top:18px}
 }
 @media (orientation: landscape) and (max-height: 520px){
-  .wrap{
-    padding-top:10px;
-  }
-  .header{
-    font-size:18px;
-    padding-bottom:0;
-  }
-  .clock{
-    font-size:clamp(64px, 18vh, 130px);
-    margin-top:10px;
-  }
+  .wrap{padding-top:10px}
+  .header{font-size:18px;padding-bottom:0}
+  .clock{font-size:clamp(64px,18vh,130px);margin-top:10px}
   .label{font-size:13px}
-  .repetition{font-size:15px; margin-top:8px}
-  .buttons{
-    margin-top:16px;
-    grid-template-columns:repeat(4, minmax(0, 1fr));
-  }
-  button{
-    min-height:48px;
-    padding:10px 12px;
-    font-size:16px;
-  }
-  .settings{
-    margin-top:18px;
-    padding:12px;
-  }
-  .row{gap:10px; margin-bottom:10px}
+  .repetition{font-size:15px;margin-top:8px}
+  .buttons{margin-top:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+  button{min-height:48px;padding:10px 12px;font-size:16px}
+  .settings{margin-top:18px;padding:12px}
+  .row{gap:10px;margin-bottom:10px}
 }
 </style>
 </head>
@@ -252,18 +94,17 @@ input[type=number], input[type=file]{
     <div class="row">
       <div class="field">
         <label for="hornInput">Custom Horn</label>
-        <input id="hornInput" type="file" accept="audio/*" onchange="loadCustomHorn(event)">
+        <input id="hornInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.mp4" onchange="loadCustomHorn(event)">
       </div>
     </div>
     <div id="soundStatus" class="status">Using built-in buzzer</div>
     <div class="hint">Only positive whole numbers are accepted.</div>
+    <div class="version">Version v1.0.0</div>
   </div>
 </div>
 
 <div id="qrOverlay" class="overlay">
-  <div class="qrbox">
-    <img id="qrImage" alt="QR code for this timer link">
-  </div>
+  <div class="qrbox"><img id="qrImage" alt="QR code for this timer link"></div>
   <div id="qrUrl" class="qrurl"></div>
   <div class="qrnote">QR works when this app is hosted at a real web address.</div>
   <div class="smallbuttons">
@@ -271,6 +112,8 @@ input[type=number], input[type=file]{
     <button type="button" class="reset" onclick="closeQR()">Close</button>
   </div>
 </div>
+
+<audio id="customHornPlayer" preload="auto"></audio>
 
 <script src="app.js"></script>
 <script>
