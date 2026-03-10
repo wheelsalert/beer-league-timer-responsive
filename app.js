@@ -1,201 +1,44 @@
-const APP_VERSION='v1.0.0';
-const DEFAULT_SECONDS=90;
-const DEFAULT_REPS=1;
-const DEFAULT_HORN_MS=550;
-const GAP_MS=700;
-
-let running=false;
-let timerId=null;
-let totalSeconds=DEFAULT_SECONDS;
-let remainingSeconds=DEFAULT_SECONDS;
-let totalReps=DEFAULT_REPS;
-let currentRep=1;
-let customHornUrl=null;
-let customHornDurationMs=1000;
-let audioCtx=null;
-let completionInProgress=false;
-let customAudioEl=null;
-
+const APP_VERSION='v1.1.2';
+const DEFAULT_SECONDS=90, DEFAULT_REPS=1, DEFAULT_HORN_MS=550, GAP_MS=700;
+const THEME_STORAGE_KEY='beerLeagueTimerTheme', HORN_CHOICE_STORAGE_KEY='beerLeagueTimerHornChoice';
+const BUNDLED_HORNS={buzz1:'./buzz1.mp3', buzz2:'./buzz2.mp3'};
+let running=false, timerId=null, totalSeconds=DEFAULT_SECONDS, remainingSeconds=DEFAULT_SECONDS, totalReps=DEFAULT_REPS, currentRep=1;
+let customHornUrl=null, customHornDurationMs=1000, audioCtx=null, completionInProgress=false, hornChoice='buzz1';
+let bundledBuffers={buzz1:null,buzz2:null}, bundledLoadPromise=null, customAudioEl=null;
 function byId(id){return document.getElementById(id);}
 function getAudioContext(){if(!audioCtx){const Ctx=window.AudioContext||window.webkitAudioContext;if(Ctx)audioCtx=new Ctx();}return audioCtx;}
-async function unlockAudio(){
-  const ctx=getAudioContext();
-  if(ctx&&ctx.state==='suspended'){try{await ctx.resume();}catch(e){}}
-  if(customAudioEl && customHornUrl){
-    try{
-      customAudioEl.muted=true;
-      customAudioEl.currentTime=0;
-      const p=customAudioEl.play();
-      if(p&&typeof p.then==='function'){await p.catch(()=>{});}
-      customAudioEl.pause();
-      customAudioEl.currentTime=0;
-      customAudioEl.muted=false;
-    }catch(e){}
-  }
-}
-function clampPositiveInt(value,fallback){const num=Number(value);if(!Number.isFinite(num))return fallback;const whole=Math.floor(num);return whole>0?whole:fallback;}
-function sanitizeNumberField(el,fallback){if(el.value==='')return;el.value=String(clampPositiveInt(el.value,fallback));}
-function sanitizeInputs(){const cleanSeconds=clampPositiveInt(byId('secondsInput').value,DEFAULT_SECONDS);const cleanReps=clampPositiveInt(byId('repsInput').value,DEFAULT_REPS);byId('secondsInput').value=String(cleanSeconds);byId('repsInput').value=String(cleanReps);return {cleanSeconds,cleanReps};}
+async function unlockAudio(){const ctx=getAudioContext();if(ctx&&ctx.state==='suspended'){try{await ctx.resume();}catch(e){}} if(customAudioEl&&customHornUrl){try{customAudioEl.muted=true;customAudioEl.currentTime=0;const p=customAudioEl.play();if(p&&typeof p.then==='function'){await p.catch(()=>{});}customAudioEl.pause();customAudioEl.currentTime=0;customAudioEl.muted=false;}catch(e){}}}
+async function ensureBundledBuffers(){if(bundledLoadPromise) return bundledLoadPromise; const ctx=getAudioContext(); if(!ctx){bundledLoadPromise=Promise.resolve(); return bundledLoadPromise;} bundledLoadPromise=(async()=>{for(const key of Object.keys(BUNDLED_HORNS)){if(bundledBuffers[key]) continue; try{const res=await fetch(BUNDLED_HORNS[key],{cache:'force-cache'}); const arr=await res.arrayBuffer(); if(arr.byteLength===0) continue; bundledBuffers[key]=await ctx.decodeAudioData(arr.slice(0));}catch(e){bundledBuffers[key]=null;}}})(); return bundledLoadPromise;}
+function playBufferOnce(buffer){const ctx=getAudioContext(); if(!ctx||!buffer) return Promise.resolve(false); return new Promise(resolve=>{try{const src=ctx.createBufferSource(); src.buffer=buffer; src.connect(ctx.destination); src.onended=()=>resolve(true); src.start();}catch(e){resolve(false);}});}
+function clampPositiveInt(v,f){const n=Number(v);if(!Number.isFinite(n))return f;const w=Math.floor(n);return w>0?w:f;}
+function sanitizeNumberField(el,f){if(el.value==='')return;el.value=String(clampPositiveInt(el.value,f));}
+function sanitizeInputs(){const s=clampPositiveInt(byId('secondsInput').value,DEFAULT_SECONDS), r=clampPositiveInt(byId('repsInput').value,DEFAULT_REPS);byId('secondsInput').value=String(s);byId('repsInput').value=String(r);return {cleanSeconds:s,cleanReps:r};}
 function updateDisplay(){byId('clock').textContent=String(Math.max(0,remainingSeconds));byId('repDisplay').textContent=`Repetition ${currentRep} of ${totalReps}`;}
-function setSoundStatus(){byId('soundStatus').textContent=customHornUrl?'Using selected custom horn':'Using built-in buzzer';}
-function loadValuesFromInputs(){const vals=sanitizeInputs();totalSeconds=vals.cleanSeconds;totalReps=vals.cleanReps;remainingSeconds=totalSeconds;currentRep=1;updateDisplay();}
-function waitMs(ms){return new Promise(resolve=>window.setTimeout(resolve,ms));}
-function updateResponsiveLayout(){const wrap=byId('appWrap');if(window.innerWidth>=900){wrap.classList.add('landscape-layout');}else{wrap.classList.remove('landscape-layout');}}
-
-function playDefaultHornOnce(durationMs=DEFAULT_HORN_MS){
-  const ctx=getAudioContext();
-  if(!ctx)return Promise.resolve();
-  return new Promise(resolve=>{
-    const now=ctx.currentTime;
-    const gain=ctx.createGain();
-    const osc1=ctx.createOscillator();
-    const osc2=ctx.createOscillator();
-    osc1.type='sawtooth'; osc2.type='square';
-    osc1.frequency.setValueAtTime(410,now); osc2.frequency.setValueAtTime(205,now);
-    gain.gain.setValueAtTime(.0001,now);
-    gain.gain.exponentialRampToValueAtTime(.22,now+.02);
-    gain.gain.exponentialRampToValueAtTime(.14,now+durationMs/1000*.6);
-    gain.gain.exponentialRampToValueAtTime(.0001,now+durationMs/1000);
-    osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
-    osc1.start(now); osc2.start(now); osc1.stop(now+durationMs/1000); osc2.stop(now+durationMs/1000);
-    window.setTimeout(resolve,durationMs+50);
-  });
-}
-
-function playCustomHornOnce(){
-  return new Promise(resolve=>{
-    if(!customAudioEl || !customHornUrl){resolve(false);return;}
-    try{
-      let settled=false;
-      const cleanup=()=>{customAudioEl.onended=null; customAudioEl.onerror=null;};
-      const finish=(played)=>{if(settled)return; settled=true; cleanup(); resolve(played);};
-      customAudioEl.pause();
-      customAudioEl.currentTime=0;
-      customAudioEl.onended=()=>finish(true);
-      customAudioEl.onerror=()=>finish(false);
-      const p=customAudioEl.play();
-      if(p && typeof p.then==='function'){
-        p.then(()=>{window.setTimeout(()=>finish(true),Math.max(200,customHornDurationMs)+50);}).catch(()=>finish(false));
-      } else {
-        window.setTimeout(()=>finish(true),Math.max(200,customHornDurationMs)+50);
-      }
-    }catch(e){
-      resolve(false);
-    }
-  });
-}
-
-async function playHornSequence(times){
-  for(let i=0;i<times;i++){
-    const ok=await playCustomHornOnce();
-    if(!ok){await playDefaultHornOnce(DEFAULT_HORN_MS);}
-    if(i<times-1){await waitMs(GAP_MS);}
-  }
-}
-
+function waitMs(ms){return new Promise(res=>window.setTimeout(res,ms));}
+function updateResponsiveLayout(){const wrap=byId('appWrap');if(window.innerWidth>=900)wrap.classList.add('landscape-layout');else wrap.classList.remove('landscape-layout');}
+function getSavedTheme(){try{return localStorage.getItem(THEME_STORAGE_KEY)||'black';}catch(e){return 'black';}}
+function applyTheme(theme){const body=document.body, select=byId('themeSelect');if(theme==='white')body.classList.add('theme-light');else{body.classList.remove('theme-light');theme='black';}if(select)select.value=theme;}
+function setTheme(theme){applyTheme(theme);try{localStorage.setItem(THEME_STORAGE_KEY,theme);}catch(e){}}
+function getSavedHornChoice(){try{return localStorage.getItem(HORN_CHOICE_STORAGE_KEY)||'buzz1';}catch(e){return 'buzz1';}}
+function loadValuesFromInputs(){const v=sanitizeInputs();totalSeconds=v.cleanSeconds;totalReps=v.cleanReps;remainingSeconds=totalSeconds;currentRep=1;updateDisplay();}
+function playDefaultHornOnce(durationMs=DEFAULT_HORN_MS){const ctx=getAudioContext();if(!ctx)return Promise.resolve();return new Promise(resolve=>{const now=ctx.currentTime,g=ctx.createGain(),o1=ctx.createOscillator(),o2=ctx.createOscillator();o1.type='sawtooth';o2.type='square';o1.frequency.setValueAtTime(410,now);o2.frequency.setValueAtTime(205,now);g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(.22,now+.02);g.gain.exponentialRampToValueAtTime(.14,now+durationMs/1000*.6);g.gain.exponentialRampToValueAtTime(.0001,now+durationMs/1000);o1.connect(g);o2.connect(g);g.connect(ctx.destination);o1.start(now);o2.start(now);o1.stop(now+durationMs/1000);o2.stop(now+durationMs/1000);window.setTimeout(resolve,durationMs+50);});}
+function playCustomHornOnce(){return new Promise(resolve=>{if(!customAudioEl||!customHornUrl){resolve(false);return;} let settled=false; const cleanup=()=>{customAudioEl.onended=null; customAudioEl.onerror=null;}; const finish=(played)=>{if(settled)return; settled=true; cleanup(); try{customAudioEl.pause(); customAudioEl.currentTime=0;}catch(e){} resolve(played);}; try{customAudioEl.pause(); customAudioEl.currentTime=0; customAudioEl.onended=()=>finish(true); customAudioEl.onerror=()=>finish(false); const p=customAudioEl.play(); if(p&&typeof p.then==='function'){p.then(()=>{window.setTimeout(()=>finish(true), Math.max(250,customHornDurationMs)+80);}).catch(()=>finish(false));} else {window.setTimeout(()=>finish(true), Math.max(250,customHornDurationMs)+80);} }catch(e){finish(false);} });}
+async function playSelectedHornOnce(){if(hornChoice==='custom') return playCustomHornOnce(); await ensureBundledBuffers(); const buffer=bundledBuffers[hornChoice]||bundledBuffers.buzz1; if(buffer) return playBufferOnce(buffer); return false;}
+async function playHornSequence(times){for(let i=0;i<times;i++){const ok=await playSelectedHornOnce(); if(!ok) await playDefaultHornOnce(DEFAULT_HORN_MS); if(i<times-1) await waitMs(GAP_MS);}}
 function pauseIntervalOnly(){if(timerId!==null){window.clearInterval(timerId);timerId=null;}running=false;}
 function isFreshStart(){return currentRep===1&&remainingSeconds===totalSeconds;}
-
-async function startTimer(){
-  if(running||completionInProgress)return;
-  await unlockAudio();
-  if(isFreshStart()){loadValuesFromInputs();}else{sanitizeInputs();}
-  running=true;
-  await playHornSequence(1);
-  if(!completionInProgress){timerId=window.setInterval(tickTimer,1000);}
-}
-
-function tickTimer(){
-  remainingSeconds-=1;
-  if(remainingSeconds<0)remainingSeconds=0;
-  updateDisplay();
-  if(remainingSeconds===0){
-    if(currentRep>=totalReps){finishTimer();return;}
-    advanceToNextRep();
-  }
-}
-
-async function advanceToNextRep(){
-  pauseIntervalOnly();
-  currentRep+=1;
-  remainingSeconds=totalSeconds;
-  updateDisplay();
-  await playHornSequence(1);
-  if(!completionInProgress){running=true;timerId=window.setInterval(tickTimer,1000);}
-}
-
-function pauseTimer(){if(completionInProgress)return;pauseIntervalOnly();}
-
-function resetToDefaultsUI(){
-  byId('secondsInput').value=String(DEFAULT_SECONDS);
-  byId('repsInput').value=String(DEFAULT_REPS);
-  byId('hornInput').value='';
-  if(customHornUrl){URL.revokeObjectURL(customHornUrl);customHornUrl=null;}
-  if(customAudioEl){
-    customAudioEl.pause();
-    customAudioEl.removeAttribute('src');
-    try{customAudioEl.load();}catch(e){}
-  }
-  customHornDurationMs=1000;
-  totalSeconds=DEFAULT_SECONDS;
-  remainingSeconds=DEFAULT_SECONDS;
-  totalReps=DEFAULT_REPS;
-  currentRep=1;
-  completionInProgress=false;
-  setSoundStatus();
-  updateDisplay();
-}
-
-function resetTimer(){completionInProgress=false;pauseIntervalOnly();resetToDefaultsUI();}
-
-async function finishTimer(){
-  if(completionInProgress)return;
-  completionInProgress=true;
-  pauseIntervalOnly();
-  await playHornSequence(3);
-  resetToDefaultsUI();
-}
-
-function loadCustomHorn(event){
-  const file=event&&event.target&&event.target.files?event.target.files[0]:null;
-  if(customHornUrl){URL.revokeObjectURL(customHornUrl);customHornUrl=null;}
-  customAudioEl=byId('customHornPlayer');
-  if(customAudioEl){
-    customAudioEl.pause();
-    customAudioEl.removeAttribute('src');
-    try{customAudioEl.load();}catch(e){}
-  }
-  if(file){
-    customHornUrl=URL.createObjectURL(file);
-    customHornDurationMs=1000;
-    customAudioEl.src=customHornUrl;
-    customAudioEl.preload='auto';
-    customAudioEl.onloadedmetadata=function(){
-      if(Number.isFinite(customAudioEl.duration)&&customAudioEl.duration>0){
-        customHornDurationMs=Math.ceil(customAudioEl.duration*1000);
-      }
-    };
-    try{customAudioEl.load();}catch(e){}
-  } else {
-    customHornDurationMs=1000;
-  }
-  setSoundStatus();
-}
-
-function showQR(){
-  const url=window.location.href;
-  byId('qrUrl').textContent=url;
-  byId('qrImage').src='https://api.qrserver.com/v1/create-qr-code/?size=256x256&data='+encodeURIComponent(url);
-  byId('qrOverlay').style.display='flex';
-}
+async function startTimer(){if(running||completionInProgress)return; await unlockAudio(); await ensureBundledBuffers(); if(isFreshStart()) loadValuesFromInputs(); else sanitizeInputs(); running=true; await playHornSequence(1); if(!completionInProgress) timerId=window.setInterval(tickTimer,1000);}
+function tickTimer(){remainingSeconds-=1; if(remainingSeconds<0) remainingSeconds=0; updateDisplay(); if(remainingSeconds===0){ if(currentRep>=totalReps){finishTimer(); return;} advanceToNextRep();}}
+async function advanceToNextRep(){pauseIntervalOnly(); currentRep+=1; remainingSeconds=totalSeconds; updateDisplay(); await playHornSequence(1); if(!completionInProgress){running=true; timerId=window.setInterval(tickTimer,1000);}}
+function pauseTimer(){if(completionInProgress)return; pauseIntervalOnly();}
+function updateHornUI(){byId('hornChoice').value=hornChoice; byId('customHornRow').style.display=hornChoice==='custom'?'grid':'none'; let text=''; if(hornChoice==='buzz1') text='Using bundled buzz1.mp3'; else if(hornChoice==='buzz2') text='Using bundled buzz2.mp3'; else text=customHornUrl?'Using selected custom horn':'Custom horn selected — choose a file'; byId('soundStatus').textContent=text;}
+function setHornChoice(value){hornChoice=(value==='buzz2'||value==='custom')?value:'buzz1'; try{localStorage.setItem(HORN_CHOICE_STORAGE_KEY,hornChoice);}catch(e){} updateHornUI();}
+function resetToDefaultsUI(){byId('secondsInput').value=String(DEFAULT_SECONDS); byId('repsInput').value=String(DEFAULT_REPS); byId('hornInput').value=''; hornChoice='buzz1'; try{localStorage.setItem(HORN_CHOICE_STORAGE_KEY,hornChoice);}catch(e){} if(customHornUrl){URL.revokeObjectURL(customHornUrl); customHornUrl=null;} if(customAudioEl){try{customAudioEl.pause(); customAudioEl.removeAttribute('src'); customAudioEl.load();}catch(e){}} customHornDurationMs=1000; totalSeconds=DEFAULT_SECONDS; remainingSeconds=DEFAULT_SECONDS; totalReps=DEFAULT_REPS; currentRep=1; completionInProgress=false; updateHornUI(); updateDisplay();}
+function resetTimer(){completionInProgress=false; pauseIntervalOnly(); resetToDefaultsUI();}
+async function finishTimer(){if(completionInProgress)return; completionInProgress=true; pauseIntervalOnly(); await playHornSequence(3); resetToDefaultsUI();}
+function loadCustomHorn(event){const file=event&&event.target&&event.target.files?event.target.files[0]:null; if(customHornUrl){URL.revokeObjectURL(customHornUrl); customHornUrl=null;} customAudioEl=byId('customHornPlayer'); if(customAudioEl){try{customAudioEl.pause(); customAudioEl.removeAttribute('src'); customAudioEl.load();}catch(e){}} if(file){customHornUrl=URL.createObjectURL(file); customHornDurationMs=1000; customAudioEl.src=customHornUrl; customAudioEl.preload='auto'; try{customAudioEl.load();}catch(e){} customAudioEl.onloadedmetadata=function(){if(Number.isFinite(customAudioEl.duration)&&customAudioEl.duration>0){customHornDurationMs=Math.ceil(customAudioEl.duration*1000);}}; hornChoice='custom'; try{localStorage.setItem(HORN_CHOICE_STORAGE_KEY,hornChoice);}catch(e){}} updateHornUI();}
+function showQR(){const url=window.location.href; byId('qrUrl').textContent=url; byId('qrImage').src='https://api.qrserver.com/v1/create-qr-code/?size=256x256&data='+encodeURIComponent(url); byId('qrOverlay').style.display='flex';}
 function closeQR(){byId('qrOverlay').style.display='none';}
 async function copyLink(){try{await navigator.clipboard.writeText(window.location.href);}catch(e){}}
-
-window.addEventListener('resize', updateResponsiveLayout);
-window.addEventListener('orientationchange', updateResponsiveLayout);
-
-customAudioEl=byId('customHornPlayer');
-updateDisplay();
-sanitizeInputs();
-setSoundStatus();
-updateResponsiveLayout();
+window.addEventListener('resize',updateResponsiveLayout); window.addEventListener('orientationchange',updateResponsiveLayout);
+customAudioEl=byId('customHornPlayer'); hornChoice=getSavedHornChoice(); if(!['buzz1','buzz2','custom'].includes(hornChoice)) hornChoice='buzz1'; updateDisplay(); sanitizeInputs(); updateResponsiveLayout(); applyTheme(getSavedTheme()); updateHornUI();
